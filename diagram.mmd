@@ -1,0 +1,25 @@
+graph TD
+    User[User Request] --> Orch[Orchestrator]
+    Orch --> TC[Task Classifier]
+    
+    TC --> |SIMPLE| QP[Quick Path]
+    TC --> |COMPLEX| DP[Deep Path]
+    
+    QP --> SP[Simple Planner]
+    SP --> FI[Fast Implementer]
+    FI --> Orch
+    
+    DP --> StrP[Strategic Planner]
+    StrP --> |Needs Research| Res[Researcher]
+    StrP --> |Needs Architecture| Arch[Architect]
+    Res --> StrP
+    Arch --> StrP
+    StrP --> |Plan Ready| Approval{Human Approval}
+    Approval --> |Approved| SI[Senior Implementer]
+    Approval --> |Rejected| Orch
+    SI --> Rev[Reviewer]
+    Rev --> |Security-Sensitive| Sec[Security Advisor]
+    Sec --> Rev
+    Rev --> |Approved| Orch
+    Rev --> |Changes Needed| SI
+    Orch --> User
