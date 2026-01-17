@@ -1,10 +1,10 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["opencode-antigravity-auth@latest"],
+  "plugin": ["opencode-antigravity-auth@1.0.0"],
 
-  "model": "opencode/glm-4.7-free",
-  "small_model": "opencode/gpt-5-nano",
-
+  "model": "opencode/claude-sonnet-4-5",
+  "small_model": "opencode/claude-haiku-4-5",
+  "default_agent": "orchestrator",
 
   "mcp": {
     "context7": {
@@ -12,73 +12,63 @@
       "url": "https://mcp.context7.com/mcp",
       "headers": {
         "CONTEXT7_API_KEY": "{env:CONTEXT7_API_KEY}"
-      }
+      },
+      "enabled": true,
+      "timeout": 10000
     },
-
     "gh_grep": {
       "type": "remote",
-      "url": "https://mcp.grep.app"
+      "url": "https://mcp.grep.app",
+      "enabled": true,
+      "timeout": 10000
+    }
+  },
+
+  "permission": {
+    "bash": {
+      "*": "ask",
+      "git status": "allow",
+      "git status *": "allow",
+      "git log *": "allow",
+      "git diff *": "allow",
+      "git branch *": "allow",
+      "ls *": "allow",
+      "cat *": "allow",
+      "head *": "allow",
+      "tail *": "allow",
+      "wc *": "allow",
+      "npm test *": "allow",
+      "npm run test *": "allow",
+      "npm run lint *": "allow",
+      "npm run build *": "allow",
+      "yarn test *": "allow",
+      "pnpm test *": "allow",
+      "pytest *": "allow",
+      "go test *": "allow",
+      "cargo test *": "allow"
     }
   },
 
   "agent": {
-
-    "explore": {
-      "model": "opencode/glm-4.7-free",
-      "permission": {
-        "edit": "deny",
-        "bash": "deny",
-        "task": {
-          "*": "deny"
-        }
-    },
-
-    "build": {
-      "model": "opencode/glm-4.7-free",
-      "permission": {
-        "edit": "allow",
-        "bash": "ask",
-        "task": {
-          "*": "deny",
-          "explore": "allow",
-          "general": "allow"
-        }
-      }
-    },
-
-    "plan": {
+    "orchestrator": {
+      "description": "Central coordinator managing multi-agent workflows. Routes tasks, handles approvals, aggregates outputs.",
+      "model": "opencode/claude-sonnet-4-5",
       "mode": "primary",
-      "model": "opencode/glm-4.7-free",
-      "prompt": "{file:/Users/andrejvysny/.config/opencode/prompts/planner.txt}",
-      "permission": {
-        "edit": "deny",
-        "write": "deny",
-        "bash": "deny",
-        "task": {
-          "*": "deny",
-          "explore": "allow",
-          "architect": "allow",
-          "reviewer": "allow",
-          "librarian": "allow"
-        }
-      },
+      "temperature": 0.2,
+      "maxSteps": 50,
+      "prompt": "{file:prompts/orchestrator.md}",
       "tools": {
+        "read": true,
         "write": false,
         "edit": false,
         "bash": false,
-        "webfetch": true
-      }
-    },
-
-    "orchestrator": {
-      "description": "Orchestrates tasks and delegates to specialized sub-agents",
-      "model": "opencode/glm-4.7-free",
-      "mode": "primary",
-      "prompt": "You are an orchestrator agent coordinating specialized subagents.\n\n## Workflow\n1. ANALYZE: Decompose user request into discrete subtasks\n2. DELEGATE: Assign each subtask to the appropriate subagent:\n   - architect: Design decisions, system structure, implementation plans\n   - coder: Code implementation following approved plans\n   - librarian: Documentation lookup, API references, best practices research\n   - reviewer: Code quality analysis, correctness verification\n3. SYNTHESIZE: Combine subagent outputs into coherent response\n4. VERIFY: Ensure all original requirements addressed\n\n## Delegation Format\nFor each delegation provide:\n- **Task**: Specific, actionable objective\n- **Context**: Relevant background information\n- **Constraints**: Scope boundaries, time/effort budget\n- **Expected Output**: What the subagent should return\n\n## Principles\n- Prefer parallel delegation when tasks are independent\n- Scale effort to complexity: simple queries need fewer agents\n- Do not duplicate work across subagents - define clear boundaries\n- If subagent output insufficient, refine task and re-delegate",
-      "tools": {
-        "write": true,
-        "edit": true,
-        "bash": true
+        "webfetch": false,
+        "grep": true,
+        "glob": true,
+        "list": true,
+        "todowrite": true,
+        "todoread": true,
+        "question": true
       },
       "permission": {
         "task": {
@@ -87,66 +77,346 @@
       }
     },
 
-    "architect": {
-      "description": "Designs software architecture and plans implementations",
-      "model": "openai/gpt-5.2-codex",
-      "reasoningEffort": "high",
-      "textVerbosity": "low",
+    "classifier": {
+      "description": "Task complexity classifier. Routes requests to Quick Path (SIMPLE) or Deep Path (COMPLEX).",
+      "model": "opencode/claude-haiku-4-5",
       "mode": "subagent",
-      "prompt": "You are a software architect designing implementations and technical solutions.\n\n## Output Structure\nFor each design, provide:\n\n### 1. Problem Analysis\n- Core requirements extracted from request\n- Constraints and boundaries\n- Assumptions made (flag for validation)\n\n### 2. Solution Design\n- Architecture overview (components, relationships)\n- Data structures with field definitions\n- Function/method signatures with parameters and return types\n- Control flow description\n\n### 3. Implementation Plan\n- Ordered list of implementation steps\n- Files to create/modify with specific changes\n- Dependencies and prerequisites\n- Integration points with existing code\n\n### 4. Tradeoffs\n- Alternatives considered\n- Why chosen approach is preferred\n- Known limitations or future considerations\n\n## Principles\n- Follow established design patterns appropriate to the problem\n- Prefer composition over inheritance\n- Design for testability\n- Keep coupling low, cohesion high\n- Document any deviations from standard practices with rationale",
+      "temperature": 0.1,
+      "maxSteps": 5,
+      "prompt": "{file:prompts/classifier.md}",
       "tools": {
+        "read": true,
         "write": false,
         "edit": false,
-        "bash": false
+        "bash": false,
+        "webfetch": false,
+        "grep": true,
+        "glob": true,
+        "list": true
+      },
+      "permission": {
+        "task": {
+          "*": "deny"
+        }
       }
     },
 
-    "coder": {
-      "model": "opencode/glm-4.7-free",
+    "simple-planner": {
+      "description": "Quick Path planner for simple tasks. Creates 3-5 step plans for 1-3 files, <50 lines.",
+      "model": "opencode/claude-haiku-4-5",
       "mode": "subagent",
-      "description": "Implements code accordingly to implementation plan.",
-      "prompt": "You are a software developer implementing code based on provided plans.\n\n## Implementation Standards\n\n### Code Quality\n- Write clear, self-documenting code with meaningful names\n- Keep functions focused and small (single responsibility)\n- Handle errors explicitly - no silent failures\n- Validate inputs at system boundaries\n- Avoid premature abstraction - prefer simple, direct solutions\n\n### Security\n- Never hardcode secrets, credentials, or API keys\n- Sanitize user inputs before use\n- Use parameterized queries for database operations\n- Apply principle of least privilege\n- Flag potential security concerns in comments\n\n### Style\n- Follow language-specific idioms and conventions\n- Match indentation and formatting to project standards\n- Import only what is needed\n- Remove dead code and unused variables\n\n## Output Format\nFor each implementation:\n1. **File path** being modified/created\n2. **Code** with clear section comments for complex logic\n3. **Usage notes** if API or behavior non-obvious\n4. **Test suggestions** - describe what should be tested (implement only if requested)\n\n## Verification\nBefore completing, verify:\n- All plan requirements implemented\n- No syntax errors\n- Error paths handled\n- No obvious security issues introduced",
+      "temperature": 0.2,
+      "maxSteps": 10,
+      "prompt": "{file:prompts/simple-planner.md}",
       "tools": {
+        "read": true,
+        "write": false,
+        "edit": false,
+        "bash": false,
+        "webfetch": false,
+        "grep": true,
+        "glob": true,
+        "list": true
+      },
+      "permission": {
+        "task": {
+          "*": "deny"
+        }
+      }
+    },
+
+    "fast-implementer": {
+      "description": "Quick Path implementer. Executes simple plans with basic self-review.",
+      "model": "opencode/gpt-5.1-codex-mini",
+      "mode": "subagent",
+      "temperature": 0.3,
+      "maxSteps": 10,
+      "prompt": "{file:prompts/fast-implementer.md}",
+      "tools": {
+        "read": true,
         "write": true,
         "edit": true,
-        "bash": true
+        "bash": true,
+        "webfetch": false
       },
       "permission": {
-        "bash": "ask"
+        "bash": "ask",
+        "task": {
+          "*": "deny"
+        }
       }
     },
 
-    "librarian": {
-      "description": "Searches documentation and knowledge sources (web, Context7 MCP, local).",
-      "model": "opencode/glm-4.7-free",
+    "strategic-planner": {
+      "description": "Deep Path planner for complex tasks. Creates 5-20 step plans, spawns Researcher/Architect as needed.",
+      "model": "opencode/claude-opus-4-5",
       "mode": "subagent",
-      "prompt": "You are a documentation librarian retrieving authoritative information from available sources.\n\n## Search Strategy\n1. Query available MCP tools first (Context7 if available)\n2. Fall back to WebFetch for broader coverage\n3. Check local documentation and code for project-specific patterns\n4. Cross-reference multiple sources for accuracy\n\n## Search Heuristics\n- Start broad, narrow progressively based on results\n- Use official documentation over blog posts or forums\n- Prefer recent sources (check dates)\n- If initial query yields poor results, reformulate before reporting failure\n\n## Output Format\n\n### For Each Finding:\n**Source**: [Name](URL) or local path\n**Relevance**: High/Medium/Low\n**Summary**: 2-3 sentence description\n**Key Excerpt**: Code snippet or relevant quote\n**Caveats**: Version specificity, deprecation warnings, known issues\n\n### Response Structure:\n1. **Direct Answer**: Concise response to the query\n2. **Supporting Evidence**: Findings with citations\n3. **Confidence Level**: High/Medium/Low with reasoning\n4. **Follow-up Suggestions**: Related queries that might help\n\n## Principles\n- Never fabricate sources or citations\n- Indicate uncertainty when sources conflict\n- Distinguish between official docs, community content, and AI-generated content\n- Note when information may be outdated",
+      "temperature": 0.2,
+      "maxSteps": 30,
+      "reasoningEffort": "high",
+      "thinking": {
+        "type": "enabled",
+        "budgetTokens": 16000
+      },
+      "prompt": "{file:prompts/strategic-planner.md}",
       "tools": {
-        "context7_*": true,
-        "gh_grep_*": true,
-        "webfetch": true,
+        "read": true,
         "write": false,
         "edit": false,
-        "bash": false
+        "bash": false,
+        "webfetch": false,
+        "grep": true,
+        "glob": true,
+        "list": true,
+        "todowrite": true,
+        "todoread": true,
+        "question": true
       },
       "permission": {
-        "webfetch": "allow"
+        "task": {
+          "*": "deny",
+          "researcher": "allow",
+          "architect": "allow",
+          "testing-specialist": "allow"
+        }
+      }
+    },
+
+    "researcher": {
+      "description": "Information gatherer. Web search, MCP integrations, documentation lookup, best practices.",
+      "model": "opencode/gemini-3-flash",
+      "mode": "subagent",
+      "temperature": 0.5,
+      "maxSteps": 20,
+      "prompt": "{file:prompts/researcher.md}",
+      "tools": {
+        "read": true,
+        "write": false,
+        "edit": false,
+        "bash": false,
+        "webfetch": true,
+        "websearch": true,
+        "grep": true,
+        "glob": true,
+        "list": true,
+        "context7_*": true,
+        "gh_grep_*": true
+      },
+      "permission": {
+        "webfetch": "allow",
+        "task": {
+          "*": "deny"
+        }
+      }
+    },
+
+    "architect": {
+      "description": "Structural/design decision maker. Evaluates trade-offs, recommends architecture approaches.",
+      "model": "opencode/claude-opus-4-5",
+      "mode": "subagent",
+      "temperature": 0.2,
+      "maxSteps": 30,
+      "reasoningEffort": "high",
+      "textVerbosity": "low",
+      "thinking": {
+        "type": "enabled",
+        "budgetTokens": 16000
+      },
+      "prompt": "{file:prompts/architect.md}",
+      "tools": {
+        "read": true,
+        "write": false,
+        "edit": false,
+        "bash": false,
+        "webfetch": false,
+        "grep": true,
+        "glob": true,
+        "list": true
+      },
+      "permission": {
+        "task": {
+          "*": "deny"
+        }
+      }
+    },
+
+    "plan-reviewer": {
+      "description": "Quality gate for plans. Scores plans 0-100, validates completeness/feasibility before human approval.",
+      "model": "opencode/claude-sonnet-4-5",
+      "mode": "subagent",
+      "temperature": 0.2,
+      "maxSteps": 15,
+      "prompt": "{file:prompts/plan-reviewer.md}",
+      "tools": {
+        "read": true,
+        "write": false,
+        "edit": false,
+        "bash": false,
+        "webfetch": false,
+        "grep": true,
+        "glob": true,
+        "list": true
+      },
+      "permission": {
+        "task": {
+          "*": "deny"
+        }
+      }
+    },
+
+    "senior-implementer": {
+      "description": "Deep Path implementer for backend/full-stack. Production-quality code with tests and error handling.",
+      "model": "opencode/gpt-5.2-codex",
+      "mode": "subagent",
+      "temperature": 0.3,
+      "maxSteps": 30,
+      "prompt": "{file:prompts/senior-implementer.md}",
+      "tools": {
+        "read": true,
+        "write": true,
+        "edit": true,
+        "bash": true,
+        "webfetch": false,
+        "todowrite": true,
+        "todoread": true,
+        "lsp": true
+      },
+      "permission": {
+        "bash": "ask",
+        "task": {
+          "*": "deny"
+        }
+      }
+    },
+
+    "frontend-specialist": {
+      "description": "Frontend/UI-UX implementer. React/Vue/Angular/Svelte, accessibility, responsive design, performance.",
+      "model": "opencode/gpt-5.1-codex",
+      "mode": "subagent",
+      "temperature": 0.3,
+      "maxSteps": 30,
+      "prompt": "{file:prompts/frontend-ui-ux-specialist.md}",
+      "tools": {
+        "read": true,
+        "write": true,
+        "edit": true,
+        "bash": true,
+        "webfetch": false,
+        "todowrite": true,
+        "todoread": true,
+        "lsp": true
+      },
+      "permission": {
+        "bash": "ask",
+        "task": {
+          "*": "deny"
+        }
+      }
+    },
+
+    "document-writer": {
+      "description": "Documentation creator. API docs, READMEs, ADRs, changelogs, code comments. Runs parallel with implementation.",
+      "model": "opencode/gemini-3-flash",
+      "mode": "subagent",
+      "temperature": 0.3,
+      "maxSteps": 20,
+      "prompt": "{file:prompts/document-writer.md}",
+      "tools": {
+        "read": true,
+        "write": true,
+        "edit": true,
+        "bash": false,
+        "webfetch": false
+      },
+      "permission": {
+        "task": {
+          "*": "deny"
+        }
       }
     },
 
     "reviewer": {
-      "model": "openai/gpt-5.2-codex",
+      "description": "Code quality reviewer. Identifies bugs, anti-patterns, edge cases. Can spawn Security Advisor.",
+      "model": "opencode/claude-sonnet-4-5",
       "mode": "subagent",
+      "temperature": 0.2,
+      "maxSteps": 20,
       "reasoningEffort": "high",
-      "textVerbosity": "low",
-      "description": "Reviews code for best practices and potential issues",
-      "prompt": "You are a code reviewer analyzing code for quality issues.\n\n## Review Priority (in order)\n1. **Correctness**: Logic errors, edge cases, error handling gaps\n2. **Security**: Injection vectors, auth flaws, data exposure\n3. **Performance**: Algorithmic complexity, resource leaks, unnecessary operations\n4. **Maintainability**: Readability, complexity, coupling, duplication\n\n## Output Format\n\n### Summary\n- Overall assessment: APPROVE / REQUEST_CHANGES / NEEDS_DISCUSSION\n- Critical issues count\n- Total findings count\n\n### Findings (ordered by severity)\n\nFor each issue:\n**[SEVERITY]** Brief title\n- **Location**: file:line or code reference\n- **Issue**: What is wrong\n- **Impact**: Why it matters\n- **Suggestion**: How to fix (with code example if helpful)\n\nSeverity levels:\n- **CRITICAL**: Bugs, security vulnerabilities, data loss risks\n- **HIGH**: Significant logic issues, performance problems\n- **MEDIUM**: Code quality, maintainability concerns\n- **LOW**: Style, minor improvements, suggestions\n\n## Review Checklist\n- [ ] All code paths tested or have test suggestions\n- [ ] Error cases handled appropriately\n- [ ] No hardcoded secrets or sensitive data\n- [ ] Input validation present where needed\n- [ ] No obvious performance anti-patterns\n- [ ] Code is readable without excessive comments\n\n## Principles\n- Be specific and actionable - vague feedback is not useful\n- Distinguish between blocking issues and suggestions\n- Acknowledge good patterns, not just problems\n- If uncertain about intent, note as question rather than issue",
+      "prompt": "{file:prompts/reviewer.md}",
       "tools": {
+        "read": true,
         "write": false,
         "edit": false,
-        "bash": false
+        "bash": true,
+        "webfetch": false,
+        "grep": true,
+        "glob": true,
+        "list": true,
+        "lsp": true,
+        "question": true
+      },
+      "permission": {
+        "bash": "ask",
+        "task": {
+          "*": "deny",
+          "security-advisor": "allow"
+        }
+      }
+    },
+
+    "security-advisor": {
+      "description": "Security specialist. OWASP Top 10 review, vulnerability identification, remediation guidance.",
+      "model": "opencode/claude-opus-4-5",
+      "mode": "subagent",
+      "temperature": 0.2,
+      "maxSteps": 25,
+      "reasoningEffort": "high",
+      "thinking": {
+        "type": "enabled",
+        "budgetTokens": 16000
+      },
+      "prompt": "{file:prompts/security-advisor.md}",
+      "tools": {
+        "read": true,
+        "write": false,
+        "edit": false,
+        "bash": true,
+        "webfetch": false,
+        "grep": true,
+        "glob": true,
+        "list": true
+      },
+      "permission": {
+        "bash": "ask",
+        "task": {
+          "*": "deny"
+        }
+      }
+    },
+
+    "testing-specialist": {
+      "description": "Testing expert. Test strategy design, unit/integration/E2E test implementation, coverage analysis.",
+      "model": "opencode/gpt-5.1-codex",
+      "mode": "subagent",
+      "temperature": 0.3,
+      "maxSteps": 25,
+      "prompt": "{file:prompts/testing-specialist.md}",
+      "tools": {
+        "read": true,
+        "write": true,
+        "edit": true,
+        "bash": true,
+        "webfetch": false,
+        "todowrite": true,
+        "todoread": true,
+        "lsp": true
+      },
+      "permission": {
+        "bash": "ask",
+        "task": {
+          "*": "deny"
+        }
       }
     }
   }
-}
 }
